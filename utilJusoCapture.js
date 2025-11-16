@@ -121,6 +121,181 @@ class JusoCapture {
     }
 
     /**
+     * 주소에서 동, 층, 호 정보를 추출
+     * @param {string} searchKeyword - 검색할 주소 키워드
+     * @returns {Object} 추출된 동, 층, 호 정보
+     */
+    extractDetailInfo(searchKeyword) {
+        const result = {
+            dong: null,
+            floor: null,
+            ho: null
+        };
+
+        // 동 정보 추출
+        const dongMatch = searchKeyword.match(/(?:제)?(\d+)동/);
+        if (dongMatch) {
+            result.dong = dongMatch[1];
+        }
+
+        // 층 정보 추출
+        const floorMatch = searchKeyword.match(/(?:제)?(\d+)층/);
+        if (floorMatch) {
+            result.floor = floorMatch[1];
+        }
+
+        // 호 정보 추출
+        const hoMatch = searchKeyword.match(/(?:제)?(\d+)호/);
+        if (hoMatch) {
+            result.ho = hoMatch[1];
+        }
+
+        return result;
+    }
+
+    /**
+     * 상세주소 페이지에서 동/층/호 select 옵션을 선택
+     * @param {Object} detailInfo - 추출된 동, 층, 호 정보
+     */
+    async selectDetailOptions(detailInfo) {
+        try {
+            console.log('상세주소 옵션 선택 시작:', detailInfo);
+
+            // 동 선택
+            if (detailInfo.dong) {
+                console.log(`동 선택 시도: ${detailInfo.dong}동`);
+                const dongSelectors = [
+                    'select[name*="dong"]',
+                    'select[id*="dong"]',
+                    'select[name*="building"]',
+                    'select[id*="building"]',
+                    'select:has(option[value*="동"])',
+                    'select:has(option:text-matches("\\d+동"))'
+                ];
+
+                for (const selector of dongSelectors) {
+                    try {
+                        const select = this.page.locator(selector).first();
+                        if (await select.isVisible({ timeout: 1000 })) {
+                            console.log(`동 선택박스 발견: ${selector}`);
+                            
+                            // 옵션들을 확인하고 일치하는 것 선택
+                            const options = await select.locator('option').all();
+                            for (const option of options) {
+                                const text = await option.textContent() || '';
+                                const value = await option.getAttribute('value') || '';
+                                
+                                if (text.includes(`${detailInfo.dong}동`) || 
+                                    value.includes(`${detailInfo.dong}`) ||
+                                    text === detailInfo.dong) {
+                                    console.log(`동 옵션 선택: "${text}" (value: ${value})`);
+                                    await select.selectOption(value);
+                                    await this.page.waitForTimeout(1000);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+            }
+
+            // 층 선택
+            if (detailInfo.floor) {
+                console.log(`층 선택 시도: ${detailInfo.floor}층`);
+                const floorSelectors = [
+                    'select[name*="floor"]',
+                    'select[id*="floor"]',
+                    'select[name*="층"]',
+                    'select[id*="층"]',
+                    'select:has(option[value*="층"])',
+                    'select:has(option:text-matches("\\d+층"))'
+                ];
+
+                for (const selector of floorSelectors) {
+                    try {
+                        const select = this.page.locator(selector).first();
+                        if (await select.isVisible({ timeout: 1000 })) {
+                            console.log(`층 선택박스 발견: ${selector}`);
+                            
+                            const options = await select.locator('option').all();
+                            for (const option of options) {
+                                const text = await option.textContent() || '';
+                                const value = await option.getAttribute('value') || '';
+                                
+                                if (text.includes(`${detailInfo.floor}층`) || 
+                                    value.includes(`${detailInfo.floor}`) ||
+                                    text === detailInfo.floor) {
+                                    console.log(`층 옵션 선택: "${text}" (value: ${value})`);
+                                    await select.selectOption(value);
+                                    await this.page.waitForTimeout(1000);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+            }
+
+            // 호 선택
+            if (detailInfo.ho) {
+                console.log(`호 선택 시도: ${detailInfo.ho}호`);
+                const hoSelectors = [
+                    'select[name*="ho"]',
+                    'select[id*="ho"]',
+                    'select[name*="unit"]',
+                    'select[id*="unit"]',
+                    'select[name*="호"]',
+                    'select[id*="호"]',
+                    'select:has(option[value*="호"])',
+                    'select:has(option:text-matches("\\d+호"))'
+                ];
+
+                for (const selector of hoSelectors) {
+                    try {
+                        const select = this.page.locator(selector).first();
+                        if (await select.isVisible({ timeout: 1000 })) {
+                            console.log(`호 선택박스 발견: ${selector}`);
+                            
+                            const options = await select.locator('option').all();
+                            for (const option of options) {
+                                const text = await option.textContent() || '';
+                                const value = await option.getAttribute('value') || '';
+                                
+                                if (text.includes(`${detailInfo.ho}호`) || 
+                                    value.includes(`${detailInfo.ho}`) ||
+                                    text === detailInfo.ho) {
+                                    console.log(`호 옵션 선택: "${text}" (value: ${value})`);
+                                    await select.selectOption(value);
+                                    await this.page.waitForTimeout(1000);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+            }
+
+            // 선택 완료 후 페이지 안정화 대기
+            await this.page.waitForTimeout(2000);
+            console.log('상세주소 옵션 선택 완료');
+            return true;
+
+        } catch (error) {
+            console.error('상세주소 옵션 선택 중 오류:', error);
+            return false;
+        }
+    }
+
+    /**
      * 주소를 검색합니다
      * @param {string} searchKeyword - 검색할 주소 키워드
      */
@@ -220,6 +395,17 @@ class JusoCapture {
                 const detailClicked = await this.clickDetailedAddressButton();
                 if (detailClicked) {
                     console.log('상세주소 페이지로 이동 완료');
+                    
+                    // 상세주소 정보 추출 및 선택
+                    const detailInfo = this.extractDetailInfo(searchKeyword);
+                    console.log('추출된 상세정보:', detailInfo);
+                    
+                    const optionSelected = await this.selectDetailOptions(detailInfo);
+                    if (optionSelected) {
+                        console.log('상세주소 옵션 선택 완료');
+                    } else {
+                        console.log('상세주소 옵션 선택 중 일부 실패 (계속 진행)');
+                    }
                 } else {
                     console.log('상세주소 버튼을 찾을 수 없어 1차 검색 결과 페이지에 머물겠습니다.');
                 }
