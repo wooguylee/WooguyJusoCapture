@@ -230,8 +230,7 @@ class JusoCapture {
     async searchAndCapture(searchKeyword, filename = null, options = {}) {
         try {
             const {
-                outputDir = 'screenshots',
-                debug = true // 디버깅 모드 기본값
+                outputDir = 'screenshots'
             } = options;
 
             // 기본 파일명 설정
@@ -250,23 +249,13 @@ class JusoCapture {
             // 주소 검색 사이트 접속
             await this.navigateToJusoSite();
             
-            // 디버깅: 초기 페이지 스크린샷
-            if (debug) {
-                await this.captureScreenshot(`${filename}_01_초기페이지`, outputDir);
-            }
-            
             // 주소 검색
             const searchSuccess = await this.searchAddress(searchKeyword);
-            
-            // 디버깅: 검색 후 페이지 스크린샷
-            if (debug) {
-                await this.captureScreenshot(`${filename}_02_검색후`, outputDir);
-            }
             
             if (searchSuccess) {
                 const capturedFiles = [];
                 
-                // 전체 페이지 캡쳐
+                // 최종 결과 페이지 캡쳐
                 const fullPagePath = await this.captureScreenshot(`${filename}_최종결과`, outputDir);
                 if (fullPagePath) capturedFiles.push(fullPagePath);
                 
