@@ -96,44 +96,7 @@ class JusoCapture {
         }
     }
 
-    /**
-     * 검색 결과 영역만 캡쳐합니다
-     * @param {string} filename - 저장할 파일명 (확장자 제외)
-     * @param {string} outputDir - 저장할 디렉토리 (기본값: screenshots)
-     */
-    async captureSearchResults(filename, outputDir = 'screenshots') {
-        try {
-            // 검색 결과 영역 찾기
-            const resultArea = this.page.locator('.result, .search-result, .list, .table, .content').first();
-            
-            if (await resultArea.isVisible()) {
-                // 디렉토리 생성
-                if (!fs.existsSync(outputDir)) {
-                    fs.mkdirSync(outputDir, { recursive: true });
-                }
-                
-                // 타임스탬프 추가
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const fullFilename = `${filename}_result_${timestamp}.png`;
-                const filePath = path.join(outputDir, fullFilename);
-                
-                // 검색 결과 영역만 스크린샷 촬영
-                await resultArea.screenshot({
-                    path: filePath
-                });
-                
-                console.log(`검색 결과 스크린샷 저장 완료: ${filePath}`);
-                return filePath;
-            } else {
-                console.log('검색 결과 영역을 찾을 수 없습니다. 전체 페이지를 캡쳐합니다.');
-                return await this.captureScreenshot(filename, outputDir);
-            }
-            
-        } catch (error) {
-            console.error('검색 결과 캡쳐 중 오류 발생:', error);
-            return await this.captureScreenshot(filename, outputDir);
-        }
-    }
+
 
     /**
      * 브라우저를 종료합니다
@@ -153,9 +116,7 @@ class JusoCapture {
     async searchAndCapture(searchKeyword, filename = null, options = {}) {
         try {
             const {
-                outputDir = 'screenshots',
-                captureFullPage = true,
-                captureResultOnly = true
+                outputDir = 'screenshots'
             } = options;
 
             // 기본 파일명 설정
@@ -176,16 +137,8 @@ class JusoCapture {
                 const capturedFiles = [];
                 
                 // 전체 페이지 캡쳐
-                if (captureFullPage) {
-                    const fullPagePath = await this.captureScreenshot(filename, outputDir);
-                    if (fullPagePath) capturedFiles.push(fullPagePath);
-                }
-                
-                // 검색 결과만 캡쳐
-                if (captureResultOnly) {
-                    const resultPath = await this.captureSearchResults(filename, outputDir);
-                    if (resultPath) capturedFiles.push(resultPath);
-                }
+                const fullPagePath = await this.captureScreenshot(filename, outputDir);
+                if (fullPagePath) capturedFiles.push(fullPagePath);
                 
                 console.log(`\n=== 주소 검색 및 캡쳐 완료 ===`);
                 console.log(`검색 키워드: ${searchKeyword}`);
@@ -228,9 +181,7 @@ async function example() {
         
         // 예제 2: 세부 옵션 설정
         await jusoCapture.searchAndCapture('서울시 종로구', '종로구_주소검색', {
-            outputDir: 'captures',
-            captureFullPage: true,
-            captureResultOnly: true
+            outputDir: 'captures'
         });
         
     } catch (error) {
@@ -246,18 +197,10 @@ module.exports = {
 
 // CLI에서 직접 실행할 때
 if (require.main === module) {
-    const args = process.argv.slice(2);
-    if (args.length === 0) {
-        console.log('사용법: node utilJusoCapture.js "검색할 주소"');
-        console.log('예시: node utilJusoCapture.js "강남구 테헤란로"');
-        process.exit(1);
-    }
-    
-    const searchKeyword = args[0];
-    const filename = args[1] || null;
+    const searchKeyword = '서울특별시 동대문구 천호대로93길 56 장한평월드메르디앙아파트 제102동 제10층 제1002호';
     
     (async () => {
         const jusoCapture = new JusoCapture();
-        await jusoCapture.searchAndCapture(searchKeyword, filename);
+        await jusoCapture.searchAndCapture(searchKeyword);
     })();
 }
