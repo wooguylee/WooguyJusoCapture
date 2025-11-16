@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "capture": "node utilJusoCapture.js",
+    "example": "node -e \"require('./utilJusoCapture.js').example()\""
   },
   "repository": {
     "type": "git",
@@ -16,5 +18,9 @@
   "bugs": {
     "url": "https://github.com/wooguylee/WooguyJusoCapture/issues"
   },
-  "homepage": "https://github.com/wooguylee/WooguyJusoCapture#readme"
+  "homepage": "https://github.com/wooguylee/WooguyJusoCapture#readme",
+  "dependencies": {
+    "@playwright/test": "^1.56.1",
+    "playwright": "^1.56.1"
+  }
 }
