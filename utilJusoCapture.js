@@ -17,13 +17,13 @@ class JusoCapture {
             slowMo: 50, // 동작 속도 조절
             args: [
                 '--window-position=1920,0', // 브라우저 윈도우를 (1920, 0) 위치에 시작
-                '--window-size=1920,1080'   // 브라우저 윈도우 크기 설정
+                '--window-size=1280,1080'   // 브라우저 윈도우 크기 설정
             ]
         });
         this.page = await this.browser.newPage();
         
         // 뷰포트 크기 설정
-        await this.page.setViewportSize({ width: 1920, height: 1080 });
+        await this.page.setViewportSize({ width: 1280, height: 1080 });
     }
 
     /**
@@ -35,12 +35,104 @@ class JusoCapture {
     }
 
     /**
+     * 검색 주소에 동/층/호 정보가 포함되어 있는지 확인
+     * @param {string} searchKeyword - 검색할 주소 키워드
+     * @returns {boolean} 상세주소 정보가 포함되어 있으면 true
+     */
+    hasDetailedAddress(searchKeyword) {
+        // 동, 층, 호 패턴 확인
+        const patterns = [
+            /\d+동/,      // 숫자+동 (예: 102동, 제102동)
+            /제\d+동/,    // 제+숫자+동
+            /\d+층/,      // 숫자+층 (예: 10층, 제10층) 
+            /제\d+층/,    // 제+숫자+층
+            /\d+호/,      // 숫자+호 (예: 1002호, 제1002호)
+            /제\d+호/     // 제+숫자+호
+        ];
+        
+        return patterns.some(pattern => pattern.test(searchKeyword));
+    }
+
+    /**
+     * 상세주소 버튼을 찾아 클릭
+     */
+    async clickDetailedAddressButton() {
+        try {
+            console.log('상세주소 버튼을 찾는 중...');
+            
+            // 상세주소 버튼을 찾기 위한 다양한 선택자
+            const detailButtonSelectors = [
+                'a:has-text("상세주소")',
+                'button:has-text("상세주소")',
+                'a[title*="상세주소"]',
+                'button[title*="상세주소"]',
+                'a:text("상세주소")',
+                'button:text("상세주소")',
+                '.btn:has-text("상세주소")',
+                '[onclick*="상세주소"]',
+                '[href*="detail"]',
+                'a[href*="상세"]',
+                'button[onclick*="detail"]'
+            ];
+            
+            for (const selector of detailButtonSelectors) {
+                try {
+                    const button = this.page.locator(selector).first();
+                    if (await button.isVisible({ timeout: 1000 })) {
+                        console.log(`상세주소 버튼 발견: ${selector}`);
+                        await button.click();
+                        console.log('상세주소 버튼 클릭 완료');
+                        
+                        // 상세주소 페이지 로딩 대기
+                        await this.page.waitForLoadState('networkidle');
+                        await this.page.waitForTimeout(2000);
+                        return true;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            // 텍스트로 상세주소 링크 찾기
+            try {
+                const detailLinks = await this.page.locator('a').all();
+                for (const link of detailLinks) {
+                    const text = await link.textContent() || '';
+                    if (text.includes('상세주소') || text.includes('상세')) {
+                        console.log(`텍스트로 상세주소 링크 발견: "${text}"`);
+                        await link.click();
+                        console.log('상세주소 링크 클릭 완료');
+                        await this.page.waitForLoadState('networkidle');
+                        await this.page.waitForTimeout(2000);
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.log('텍스트 기반 상세주소 링크 찾기 실패:', e.message);
+            }
+            
+            console.log('상세주소 버튼을 찾을 수 없습니다.');
+            return false;
+            
+        } catch (error) {
+            console.error('상세주소 버튼 클릭 중 오류:', error);
+            return false;
+        }
+    }
+
+    /**
      * 주소를 검색합니다
      * @param {string} searchKeyword - 검색할 주소 키워드
      */
     async searchAddress(searchKeyword) {
         try {
             console.log(`주소 검색 시작: ${searchKeyword}`);
+            
+            // 동/층/호 정보 포함 여부 확인
+            const hasDetailInfo = this.hasDetailedAddress(searchKeyword);
+            if (hasDetailInfo) {
+                console.log('검색 주소에 동/층/호 정보가 포함되어 있습니다. 1차 검색 후 상세주소를 클릭합니다.');
+            }
             
             // 페이지 로딩 완료까지 대기
             await this.page.waitForLoadState('networkidle');
@@ -120,6 +212,17 @@ class JusoCapture {
             
             if (!hasResults) {
                 console.warn('검색 결과를 확인할 수 없지만 검색은 수행했습니다.');
+            }
+            
+            // 동/층/호 정보가 있는 경우 상세주소 버튼 클릭
+            if (hasDetailInfo && hasResults) {
+                console.log('동/층/호 정보가 있으므로 상세주소 버튼을 클릭합니다.');
+                const detailClicked = await this.clickDetailedAddressButton();
+                if (detailClicked) {
+                    console.log('상세주소 페이지로 이동 완료');
+                } else {
+                    console.log('상세주소 버튼을 찾을 수 없어 1차 검색 결과 페이지에 머물겠습니다.');
+                }
             }
             
             console.log(`주소 검색 완료: ${searchKeyword}`);
