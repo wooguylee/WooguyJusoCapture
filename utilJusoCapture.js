@@ -40,26 +40,103 @@ class JusoCapture {
      */
     async searchAddress(searchKeyword) {
         try {
-            // 검색창 찾기 및 클릭
-            const searchInput = this.page.locator('input[name="keyword"], input#keyword, input.search-input, input[placeholder*="주소"], input[placeholder*="검색"]').first();
+            console.log(`주소 검색 시작: ${searchKeyword}`);
+            
+            // 페이지 로딩 완료까지 대기
+            await this.page.waitForLoadState('networkidle');
+            
+            // 검색창 찾기 (여러 가능성을 시도)
+            let searchInput;
+            const inputSelectors = [
+                'input[name="keyword"]',
+                'input#keyword', 
+                'input[id*="search"]',
+                'input[name*="search"]',
+                'input.search-input',
+                'input[placeholder*="주소"]',
+                'input[placeholder*="검색"]',
+                'input[type="text"]'
+            ];
+            
+            for (const selector of inputSelectors) {
+                try {
+                    searchInput = this.page.locator(selector).first();
+                    if (await searchInput.isVisible({ timeout: 1000 })) {
+                        console.log(`검색창 발견: ${selector}`);
+                        break;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            if (!searchInput || !(await searchInput.isVisible())) {
+                console.log('검색창을 찾을 수 없습니다. 페이지 상태를 확인합니다.');
+                await this.debugPageState();
+                throw new Error('검색창을 찾을 수 없습니다.');
+            }
             
             // 검색창에 키워드 입력
+            await searchInput.click();
             await searchInput.clear();
             await searchInput.fill(searchKeyword);
+            console.log('검색어 입력 완료');
             
-            // 검색 버튼 찾기 및 클릭
-            const searchButton = this.page.locator('button:has-text("검색"), button:has-text("조회"), input[type="submit"], button[type="submit"]').first();
-            await searchButton.click();
+            // 입력 완료 후 약간의 대기
+            await this.page.waitForTimeout(500);
+            
+            // Enter키로 검색 실행 (버튼 클릭보다 안정적)
+            console.log('Enter키로 검색을 실행합니다.');
+            await searchInput.press('Enter');
             
             // 검색 결과 로딩 대기
+            console.log('검색 결과 로딩 대기 중...');
             await this.page.waitForLoadState('networkidle');
-            await this.page.waitForTimeout(2000); // 추가 대기 시간
+            await this.page.waitForTimeout(3000); // 검색 결과 표시 대기
+            
+            // 검색 결과가 나타났는지 확인
+            const possibleResultSelectors = [
+                'table',
+                '.result',
+                '.search-result', 
+                '.list',
+                '[id*="result"]',
+                '[class*="result"]'
+            ];
+            
+            let hasResults = false;
+            for (const selector of possibleResultSelectors) {
+                try {
+                    const resultElement = this.page.locator(selector).first();
+                    if (await resultElement.isVisible({ timeout: 2000 })) {
+                        console.log(`검색 결과 확인됨: ${selector}`);
+                        hasResults = true;
+                        break;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            if (!hasResults) {
+                console.warn('검색 결과를 확인할 수 없지만 검색은 수행했습니다.');
+            }
             
             console.log(`주소 검색 완료: ${searchKeyword}`);
             return true;
             
         } catch (error) {
             console.error('주소 검색 중 오류 발생:', error);
+            
+            // 디버깅을 위해 현재 페이지의 HTML 구조 일부 출력
+            try {
+                const pageContent = await this.page.content();
+                console.log('현재 페이지 제목:', await this.page.title());
+                console.log('현재 URL:', this.page.url());
+            } catch (e) {
+                console.error('디버깅 정보 수집 실패:', e);
+            }
+            
             return false;
         }
     }
@@ -96,6 +173,43 @@ class JusoCapture {
         }
     }
 
+    /**
+     * 페이지의 현재 상태를 디버깅합니다
+     */
+    async debugPageState() {
+        try {
+            console.log('\n=== 페이지 상태 디버깅 ===');
+            console.log('현재 URL:', this.page.url());
+            console.log('페이지 제목:', await this.page.title());
+            
+            // 입력 요소들 확인
+            const inputs = await this.page.locator('input').all();
+            console.log(`\n발견된 input 요소 수: ${inputs.length}`);
+            for (let i = 0; i < Math.min(inputs.length, 5); i++) {
+                const input = inputs[i];
+                const type = await input.getAttribute('type') || '';
+                const name = await input.getAttribute('name') || '';
+                const id = await input.getAttribute('id') || '';
+                const placeholder = await input.getAttribute('placeholder') || '';
+                console.log(`  ${i+1}. type="${type}" name="${name}" id="${id}" placeholder="${placeholder}"`);
+            }
+            
+            // 버튼 요소들 확인
+            const buttons = await this.page.locator('button, input[type="submit"], input[type="button"]').all();
+            console.log(`\n발견된 button/submit 요소 수: ${buttons.length}`);
+            for (let i = 0; i < Math.min(buttons.length, 5); i++) {
+                const button = buttons[i];
+                const text = await button.textContent() || '';
+                const value = await button.getAttribute('value') || '';
+                const onclick = await button.getAttribute('onclick') || '';
+                console.log(`  ${i+1}. text="${text}" value="${value}" onclick="${onclick.substring(0, 50)}"`);
+            }
+            
+        } catch (error) {
+            console.error('페이지 상태 디버깅 중 오류:', error);
+        }
+    }
+
 
 
     /**
@@ -116,7 +230,8 @@ class JusoCapture {
     async searchAndCapture(searchKeyword, filename = null, options = {}) {
         try {
             const {
-                outputDir = 'screenshots'
+                outputDir = 'screenshots',
+                debug = true // 디버깅 모드 기본값
             } = options;
 
             // 기본 파일명 설정
@@ -124,20 +239,35 @@ class JusoCapture {
                 filename = searchKeyword.replace(/[^\w\s가-힣]/g, '').replace(/\s+/g, '_');
             }
 
+            console.log(`\n=== 주소 검색 및 캡쳐 시작 ===`);
+            console.log(`검색 키워드: ${searchKeyword}`);
+            console.log(`파일명: ${filename}`);
+            console.log(`저장 경로: ${outputDir}`);
+
             // 브라우저 초기화
             await this.init();
             
             // 주소 검색 사이트 접속
             await this.navigateToJusoSite();
             
+            // 디버깅: 초기 페이지 스크린샷
+            if (debug) {
+                await this.captureScreenshot(`${filename}_01_초기페이지`, outputDir);
+            }
+            
             // 주소 검색
             const searchSuccess = await this.searchAddress(searchKeyword);
+            
+            // 디버깅: 검색 후 페이지 스크린샷
+            if (debug) {
+                await this.captureScreenshot(`${filename}_02_검색후`, outputDir);
+            }
             
             if (searchSuccess) {
                 const capturedFiles = [];
                 
                 // 전체 페이지 캡쳐
-                const fullPagePath = await this.captureScreenshot(filename, outputDir);
+                const fullPagePath = await this.captureScreenshot(`${filename}_최종결과`, outputDir);
                 if (fullPagePath) capturedFiles.push(fullPagePath);
                 
                 console.log(`\n=== 주소 검색 및 캡쳐 완료 ===`);
